@@ -232,4 +232,5 @@ def update(frame):
 
 ani = FuncAnimation(fig, update, frames=600, interval=30, blit=True)
 plt.legend(loc='upper right')
+ani.save('robot_animation.mp4', writer='ffmpeg', fps=30, dpi=100)
 plt.show()

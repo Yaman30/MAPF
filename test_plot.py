@@ -42,7 +42,7 @@ def skapa_bana(waypoints, L, v_max, ay_max):
 class Robot:
     def __init__(self, id_num, start_state, waypoints, color, label):
         self.id = id_num
-        self.state = np.array(start_state, dtype=float)  # x, y, psi
+        self.state = np.array([*start_state, 0.0], dtype=float)  # x, y, psi
         self.color = color
         self.label = label
 
@@ -61,27 +61,44 @@ class Robot:
 L = 1.0
 W = 0.5
 Ts = 0.1
-v_max = 1.0
+v_max = 2.0
 ay_max = 0.6
 Look_ahead = 1.5
 Safe_dist = 2.0
+a_max=0.5
+a_brake=1.0
 
 Q = np.diag([15.0, 10.0])
 R = np.array([[1.0]])
 
 # Bana 1
-waypoints1 = np.array([
+'''waypoints1 = np.array([
     [0, 0], [5, 0], [10, 7], [13, 5],
     [16, 5], [20, 8], [25, -3]
 ])
-
+'''
+waypoints1 = np.array([
+    [0, 2], [15, 2], [25, 2],
+    [40, 12],
+    [55, 12], [70, 12],
+    [85, 2],
+    [95, 2], [110, 2]
+])
 # Bana 2
-waypoints2 = np.array([
+'''waypoints2 = np.array([
     [0, 7], [5, 7], [10, 0], [13, 2],
     [16, 2], [20, -1], [25, 9]
 ])
-r1 = Robot(1,[0, 0, 0], waypoints1, 'cyan', 'Robot 1')
-r2 = Robot(2,[0, 7, 0], waypoints2, 'orange', 'Robot 2')
+'''
+waypoints2 = np.array([
+    [0, 12], [15, 12], [25, 12],
+    [40, 2],
+    [55, 2], [70, 2],
+    [85, 12],
+    [95, 12], [110, 12]
+])
+r1 = Robot(1,[0, 2, 0], waypoints1, 'cyan', 'Robot 1')
+r2 = Robot(2,[0, 12, 0], waypoints2, 'orange', 'Robot 2')
 robots = [r1, r2]
 
 
@@ -103,9 +120,9 @@ def wrap_angle(angle):
 
 # Grafik
 
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.set_xlim(-2, 28)
-ax.set_ylim(-5, 10)
+fig, ax = plt.subplots(figsize=(14, 6))
+ax.set_xlim(-2, 115)
+ax.set_ylim(-20, 20)
 ax.set_aspect('equal')
 ax.grid(True)
 ax.set_title("LQR Multi-Robot")
@@ -118,19 +135,24 @@ for r in robots:
     rect = patches.Rectangle((0, 0), L, W, color=r.color, alpha=0.8, label=r.label)
     ax.add_patch(rect)
     trail, = ax.plot([], [], color=r.color, linewidth=2)
+    target_circle = patches.Circle((0, 0), radius=Safe_dist / 2, color=r.color, fill=False, linestyle='--', alpha=0.5,
+                                   linewidth=1.5)
+    ax.add_patch(target_circle)
     target_dot, = ax.plot([], [], 'ro', markersize=4, alpha=0.5)
-    gfx_objects[r] = {'rect': rect, 'trail': trail, 'target': target_dot}
+    gfx_objects[r] = {'rect': rect, 'trail': trail, 'target': target_dot, 'target_circle': target_circle}
 
 status_text = ax.text(0.02, 0.95, "", transform=ax.transAxes, fontsize=10, color='red', fontweight='bold')
-
+# Håller koll på krockar
+krock_counter = 0
+is_colliding = False
 
 def update(frame):
     #  Kollision
-
+    global krock_counter, is_colliding
     artists = [status_text]
     move_permissions = {r: True for r in robots}
-    warning = ""
-
+    #warning = ""
+    collision_this_frame = False
 
     for i in range(len(robots)):
         for j in range(i + 1, len(robots)):
@@ -145,19 +167,32 @@ def update(frame):
             dist = np.sqrt((ra.state[0] - rb.state[0]) ** 2 + (ra.state[1] - rb.state[1]) ** 2)
 
             if dist < Safe_dist:
-                warning = "VARNING: Krockrisk!"
+                collision_this_frame = True
+                #warning = "VARNING: Krockrisk!"
 
-                if ra.id > rb.id:
-                    move_permissions[ra] = False
-                else:
-                    move_permissions[rb] = False
+                #if ra.id > rb.id:
+                 #   move_permissions[ra] = False
+                #else:
+                 #   move_permissions[rb] = False
+    if collision_this_frame:
+                   
+        if not is_colliding:
+            krock_counter += 1
+            is_colliding = True
+    else:
 
-    status_text.set_text(warning)
+        is_colliding = False
+
+
+    status_text.set_text(f"Antal krockrisker: {krock_counter}")
+
+
+    #status_text.set_text(warning)
 
 
     for r in robots:
         if not r.finished:
-            x, y, psi = r.state
+            x, y, psi, v = r.state
 
             # Hitta var vi är på banan
             dists = (x - r.x_r) ** 2 + (y - r.y_r) ** 2
@@ -174,8 +209,9 @@ def update(frame):
             # Stanna på målet
             if dist_to_goal < 0.1:
                 r.finished = True
-                r.state[0] = goal_x
-                r.state[1] = goal_y
+                r.state[:] = [goal_x, goal_y, psi, 0.0]
+                gfx_objects[r]['target_circle'].set_alpha(0)
+                gfx_objects[r]['target'].set_alpha(0)
 
             else:
                 target_s = current_s + Look_ahead
@@ -188,34 +224,40 @@ def update(frame):
 
                 # Bromsa mjukt
                 dist_remaining = r.s_fine[-1] - current_s
-                vr = r.v_r[target_idx]
+                v_ref = r.v_r[target_idx]
+                v_stop = np.sqrt(2 * a_brake * max(dist_remaining, 0.0))
+                v_ref = min(v_ref, v_stop)
 
-                if dist_remaining < 1.0:
-                    vr = vr * (dist_remaining / 1.0)
-                    if vr < 0.2: vr = 0.2
+                #if dist_remaining < 1.0:
+                #    v_ref = v_ref * (dist_remaining / 1.0)
+                #    if v_ref < 0.2: v_ref = 0.2
 
                 if not move_permissions[r]:
-                    vr = 0.0
+                    v_ref = 0.
+                if v < v_ref:
+                    v = min(v + a_max * Ts, v_ref)  # Gasa
+                else:
+                    v = max(v - a_brake * Ts, v_ref)
 
                 ey = -np.sin(psir) * (x - xr) + np.cos(psir) * (y - yr)
                 epsi = wrap_angle(psi - psir)
 
-                K = get_lqr_gain(vr)
+                K = get_lqr_gain(max(v, 0.1))
                 delta_delta = -(K @ np.array([ey, epsi]))[0]
                 delta = np.clip(deltar + delta_delta, -0.6, 0.6)
 
-                x += vr * np.cos(psi) * Ts
-                y += vr * np.sin(psi) * Ts
-                psi += (vr / L) * np.tan(delta) * Ts
+                x += v * np.cos(psi) * Ts
+                y += v * np.sin(psi) * Ts
+                psi += (v / L) * np.tan(delta) * Ts
 
-                r.state[:] = [x, y, psi]
+                r.state[:] = [x, y, psi, v]
                 r.x_hist.append(x)
                 r.y_hist.append(y)
-
+                gfx_objects[r]['target_circle'].center = (xr, yr)
                 gfx_objects[r]['target'].set_data([xr], [yr])
 
         # Rita
-        x, y, psi = r.state
+        x, y, psi, v = r.state
 
         diag = np.sqrt(L ** 2 + W ** 2) / 2
         q = np.arctan(W / L) + psi
@@ -224,7 +266,7 @@ def update(frame):
 
         gfx_objects[r]['trail'].set_data(r.x_hist, r.y_hist)
 
-        artists.extend([gfx_objects[r]['rect'], gfx_objects[r]['trail'], gfx_objects[r]['target']])
+        artists.extend([gfx_objects[r]['rect'], gfx_objects[r]['trail'], gfx_objects[r]['target'], gfx_objects[r]['target_circle']])
 
 
     return artists
@@ -232,4 +274,5 @@ def update(frame):
 
 ani = FuncAnimation(fig, update, frames=600, interval=30, blit=True)
 plt.legend(loc='upper right')
+#ani.save('robot_animation.mp4', writer='ffmpeg', fps=30, dpi=100)
 plt.show()

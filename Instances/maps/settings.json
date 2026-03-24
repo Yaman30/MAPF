@@ -1,0 +1,42 @@
+{
+    "set_0": {
+        "n_agents": 5,
+        "n_vertices": 25,
+        "n_tasks": 25,
+        "end_time": 100,
+        "space_size": [
+            15.0,
+            15.0
+        ]
+    },
+    "set_1": {
+        "n_agents": 10,
+        "n_vertices": 50,
+        "n_tasks": 50,
+        "end_time": 100,
+        "space_size": [
+            21.213203435596427,
+            21.213203435596427
+        ]
+    },
+    "set_2": {
+        "n_agents": 25,
+        "n_vertices": 125,
+        "n_tasks": 125,
+        "end_time": 100,
+        "space_size": [
+            33.54101966249685,
+            33.54101966249685
+        ]
+    },
+    "set_3": {
+        "n_agents": 50,
+        "n_vertices": 250,
+        "n_tasks": 250,
+        "end_time": 100,
+        "space_size": [
+            47.43416490252569,
+            47.43416490252569
+        ]
+    }
+}

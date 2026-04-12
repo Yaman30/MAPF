@@ -4,7 +4,22 @@ import numpy as np
 from scipy.interpolate import CubicSpline
 from matplotlib.animation import FuncAnimation
 import casadi as ca
+from ReferenceTrajectoryUtils import get_instance_trajectories
 
+############# EXEMPEL: hämta ref-trajectorier från fil #############
+instance = 'instance_25254ef2-0876-4627-80d9-0c97b76cfbe9.json'
+
+trajectories = get_instance_trajectories(instance, wait_dir='incoming')
+# wait_dir = 'incoming': agentens ref-vinkel när den väntar är samma som den hade när den kom till noden
+# wait_dir = 'outgoing': agentens ref-vinkel när den väntar är samma som den har när den lämnar noden (dvs riktning mot nästa nod)
+# wait_dir = 'avg': agentens ref-vinkel när den väntar är genomsnittet av ingående och utgående riktning (om båda finns, annars samma som den riktning som finns)
+
+# Trajectories (dict) contains one trajectory for each agent
+agent_0_trajectory = trajectories['a0']
+print(agent_0_trajectory(0))        # trajectory point at time t=0
+print(agent_0_trajectory(56.7))     # trajectory point at time t=56.7
+print(agent_0_trajectory(100))      # trajectory point at time t=100
+##############################################################################
 
 
 # 1. BANA OCH WAYPOINTS

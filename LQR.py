@@ -13,7 +13,7 @@ Ts = 0.1
 v_max = 2.0
 delta_max = 1.0
 COLLISION_RADIUS = 1.0
-SAFE_ZONE_RADIUS = 1.5
+SAFE_ZONE_RADIUS = 0.8
 LOOKAHEAD_TIME = 0.3
 GHOST_VISUAL_TIME = 1.0
 # LQR-vikter
@@ -21,7 +21,7 @@ Q = np.diag([15.0, 10.0])
 R = np.array([[1.0]])
 
 # Instansnamn
-INSTANCE_NAME = 'instance_e26764dc-0263-4531-a8fa-e3d0a3077de6.json'
+INSTANCE_NAME = 'instance_f229f7bd-94be-4fe8-890b-c827558e6d6e.json'
 
 def wrap_angle(angle):
     return (angle + np.pi) % (2 * np.pi) - np.pi
@@ -54,10 +54,10 @@ def get_lqr_gain(v_nom):
     return K
 
 
-def build_reference_state(robot, current_time):
-    t_ref = current_time + LOOKAHEAD_TIME
+def build_reference_state(robot):
+    t_ref = robot.progress_time + LOOKAHEAD_TIME
     t_ref2 = t_ref + Ts
-    t_ghost = current_time + GHOST_VISUAL_TIME
+    t_ghost = robot.progress_time + GHOST_VISUAL_TIME
 
     ref1 = robot.trajectory(t_ref)
     ref2 = robot.trajectory(t_ref2)
@@ -68,8 +68,8 @@ def build_reference_state(robot, current_time):
     psir_raw = float(ref1[2])
     vr = float(ref1[3])
 
-    xr2 = float(ref2[0])
-    yr2 = float(ref2[1])
+    #xr2 = float(ref2[0])
+    #yr2 = float(ref2[1])
     psir2_raw = float(ref2[2])
     vr2 = float(ref2[3])
 
@@ -109,6 +109,7 @@ def robot_step(state, v_cmd, delta_cmd):
 # 3. ROBOTKLASS
 class Robot:
     def __init__(self, id_num, agent_id, trajectory_fn, color, label):
+        self.progress_time = 0.0
         self.id = id_num
         self.agent_id = agent_id
         self.trajectory = trajectory_fn
@@ -116,11 +117,7 @@ class Robot:
         self.label = label
 
         start_ref = self.trajectory(0.0)
-        self.state = np.array([
-            float(start_ref[0]),
-            float(start_ref[1]),
-            float(start_ref[2])
-        ], dtype=float)
+        self.state = np.array([(start_ref[0]), (start_ref[1]), (start_ref[2])], dtype=float)
 
         self.start_xy = np.array([float(start_ref[0]), float(start_ref[1])], dtype=float)
 
@@ -223,7 +220,7 @@ def update(frame):
         if not r.finished:
             x, y, psi = r.state
 
-            xr, yr, psir, vr, deltar, ghost_xy = build_reference_state(r, current_time)
+            xr, yr, psir, vr, deltar, ghost_xy = build_reference_state(r)
 
             # Ghost + target
             gfx['ghost_marker'].set_data([ghost_xy[0]], [ghost_xy[1]])
@@ -238,8 +235,19 @@ def update(frame):
             delta = np.clip(deltar + delta_delta, -delta_max, delta_max)
 
             # Uppdatera tillstånd med referenshastigheten
-            r.state = robot_step(r.state, vr, delta)
+            #r.state = robot_step(r.state, vr, delta)
+            pos_error = np.hypot(x - xr, y - yr)
+            v_cmd = np.clip(vr - 0.4 * pos_error, 0.0, v_max)
+            r.state = robot_step(r.state, v_cmd, delta)
 
+            if pos_error < 0.5:
+                robot_progress_speed = 1.0
+            elif pos_error < 1.5:
+                robot_progress_speed = 0.4
+            else:
+                robot_progress_speed = 0.1
+
+            r.progress_time += Ts * robot_progress_speed
             # Historik
             r.x_hist.append(r.state[0])
             r.y_hist.append(r.state[1])
@@ -285,7 +293,7 @@ def update(frame):
 
     return artists
 
-ani = FuncAnimation(fig, update, frames=1000, interval=Ts * 1000, blit=False)
+ani = FuncAnimation(fig, update, frames=2000, interval=Ts * 1000, blit=False)
 plt.legend(loc='upper right')
 ani.save('lqr_robot_ghost_reference.mp4', writer='ffmpeg', fps=30, dpi=100)
 plt.show()

@@ -21,14 +21,14 @@ GHOST_VISUAL_TIME = 1.0
 # CBF / QP-inställningar
 alpha_cbf = 0.5
 R_safe_sq = (2.0 * SAFE_ZONE_RADIUS) ** 2
-QP_SLACK_WEIGHT = 600.0
+QP_SLACK_WEIGHT = 400.0
 
 # LQR-vikter
 Q = np.diag([15.0, 10.0])
 R = np.array([[1.0]])
 
 # Instansnamn
-INSTANCE_NAME = 'instance_f229f7bd-94be-4fe8-890b-c827558e6d6e.json'
+INSTANCE_NAME = 'instance_e26764dc-0263-4531-a8fa-e3d0a3077de6.json'
 
 
 def wrap_angle(angle):
@@ -141,7 +141,6 @@ class Robot:
         self.trajectory = trajectory_fn
         self.color = color
         self.label = label
-
         self.finished = False
         self.last_delta_cmd = 0.0
         self.last_v_cmd = 0.0

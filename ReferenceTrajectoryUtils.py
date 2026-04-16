@@ -104,7 +104,9 @@ def get_instance_trajectories(instance, wait_dir='incoming'):
                 continue
 
             # if first action, direction is the same as the next action
-            if i == 0:
+            if i == 0 and i == len(path) - 1:
+                direction = 0.0  # single wait action with no neighbors
+            elif i == 0:
                 direction = directions[i+1]
             # if last action, direction is the same as the previous action
             elif i == len(path) - 1:
